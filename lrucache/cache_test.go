@@ -35,11 +35,11 @@ func TestCache_Get(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		c.Set(i, i)
 	}
+    // 4 3 2 1 0
+	c.Get(0) // 0 4 3 2 1
+	c.Get(1) // 1 0 4 3 2
 
-	c.Get(0)
-	c.Get(1)
-
-	c.Set(5, 5)
+	c.Set(5, 5) // 5 
 	c.Set(6, 6)
 
 	var keys, values []int

@@ -1,6 +1,7 @@
 //go:build !solution
 
 package cond
+// import "fmt"
 
 // A Locker represents an object that can be locked and unlocked.
 type Locker interface {
@@ -17,11 +18,16 @@ type Locker interface {
 // when calling the Wait method.
 type Cond struct {
 	L Locker
+	waitList []chan int
+	mu chan int
 }
 
 // New returns a new Cond with Locker l.
 func New(l Locker) *Cond {
-	return &Cond{L: l}
+	return &Cond{
+		L: l,
+		mu: make(chan int, 1),
+	}
 }
 
 // Wait atomically unlocks c.L and suspends execution
@@ -41,7 +47,20 @@ func New(l Locker) *Cond {
 //    c.L.Unlock()
 //
 func (c *Cond) Wait() {
+	
+	// add new ch to c.waitList 
+	c.mu <- 1
+	ch := make(chan int, 1)
+	c.waitList = append(c.waitList, ch)
+	<- c.mu
+	
+	c.L.Unlock()
 
+    // block on ch
+	<- ch
+
+	c.L.Lock()
+	
 }
 
 // Signal wakes one goroutine waiting on c, if there is any.
@@ -49,6 +68,17 @@ func (c *Cond) Wait() {
 // It is allowed but not required for the caller to hold c.L
 // during the call.
 func (c *Cond) Signal() {
+	c.mu <- 1
+	var ch chan int
+	if len(c.waitList) > 0 {
+		ch = c.waitList[0]
+		c.waitList = c.waitList[1:]
+	}
+	<- c.mu
+	
+	if ch != nil {
+		ch <- 1
+	}
 
 }
 
@@ -57,5 +87,12 @@ func (c *Cond) Signal() {
 // It is allowed but not required for the caller to hold c.L
 // during the call.
 func (c *Cond) Broadcast() {
+	c.mu <- 1
+	waitList := c.waitList
+	c.waitList = nil
+	<- c.mu
 
+	for _, ch := range waitList {
+		ch <- 1
+	}
 }

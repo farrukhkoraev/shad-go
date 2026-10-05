@@ -57,6 +57,11 @@ func ParseList(in string) (AddressRangeList, error) {
 	if errCode != 0 || lex.err != nil {
 		return nil, fmt.Errorf("could not parse target: %w", lex.err)
 	}
+	for _, r := range lex.output {
+		if r.Min == nil || r.Max == nil {
+			return nil, fmt.Errorf("could not parse target: invalid address range")
+		}
+	}
 	return lex.output, nil
 }
 
@@ -66,6 +71,9 @@ func Parse(in string) (*AddressRange, error) {
 	l, err := ParseList(in)
 	if err != nil {
 		return nil, err
+	}
+	if len(l) == 0 {
+		return nil, fmt.Errorf("zero adress length")
 	}
 	return &l[0], nil
 }
@@ -490,17 +498,21 @@ ipdefault:
 		ipDollar = ipS[ippt-3 : ippt+1]
 		{
 			mask := net.CIDRMask(int(ipDollar[3].num), 32)
-			min := ipDollar[1].addrRange.Min.Mask(mask)
-			maxInt := binary.BigEndian.Uint32([]byte(min)) +
-				0xffffffff -
-				binary.BigEndian.Uint32([]byte(mask))
-			maxBytes := make([]byte, 4)
-			binary.BigEndian.PutUint32(maxBytes, maxInt)
-			maxBytes = maxBytes[len(maxBytes)-4:]
-			max := net.IP(maxBytes)
-			ipVAL.addrRange = AddressRange{
-				Min: min.To4(),
-				Max: max.To4(),
+			if mask == nil {
+				ipVAL.addrRange = AddressRange{}
+			} else {
+				min := ipDollar[1].addrRange.Min.Mask(mask)
+				maxInt := binary.BigEndian.Uint32([]byte(min)) +
+					0xffffffff -
+					binary.BigEndian.Uint32([]byte(mask))
+				maxBytes := make([]byte, 4)
+				binary.BigEndian.PutUint32(maxBytes, maxInt)
+				maxBytes = maxBytes[len(maxBytes)-4:]
+				max := net.IP(maxBytes)
+				ipVAL.addrRange = AddressRange{
+					Min: min.To4(),
+					Max: max.To4(),
+				}
 			}
 		}
 	case 6:
